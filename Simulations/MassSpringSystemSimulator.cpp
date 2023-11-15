@@ -6,11 +6,12 @@ MassSpringSystemSimulator::MassSpringSystemSimulator() {
 	m_iIntegrator = none;
 	this->mass_points = std::vector<MassPoint>();
 	this->springs = std::vector<Spring>();
+	this->movablePoints = std::vector<int>();
 }
 
 const char* MassSpringSystemSimulator::getTestCasesStr()
 {
-	return "Demo1,Demo2,Demo3,Demo4,Test";
+	return "Demo1,Demo2,Demo3,Demo4";
 }
 
 void MassSpringSystemSimulator::initUI(DrawingUtilitiesClass* DUC)
@@ -51,7 +52,6 @@ void MassSpringSystemSimulator::initUI(DrawingUtilitiesClass* DUC)
 		TwAddVarRW(DUC->g_pTweakBar, "Integrator", integratorsType, &this->m_iIntegrator, nullptr);
 		TwAddVarRW(DUC->g_pTweakBar, "horizontal points", TW_TYPE_UINT16, &this->numHorizontalPoints, nullptr);
 		TwAddVarRW(DUC->g_pTweakBar, "vertical points", TW_TYPE_UINT16, &this->numVerticalPoints, nullptr);
-		TwAddVarRW(DUC->g_pTweakBar, "external force", TW_TYPE_DIR3F, &this->m_externalForce, nullptr);
 		TwAddVarRW(DUC->g_pTweakBar, "gravity", TW_TYPE_FLOAT, &this->gravity, nullptr);
 		TwAddVarRW(DUC->g_pTweakBar, "damping factor", TW_TYPE_FLOAT, &this->m_fDamping, nullptr);
 		TwAddVarRW(DUC->g_pTweakBar, "stiffness", TW_TYPE_FLOAT, &this->m_fStiffness, nullptr);
@@ -64,6 +64,7 @@ void MassSpringSystemSimulator::reset()
 {
 	this->mass_points.clear();
 	this->springs.clear();
+	this->movablePoints.clear();
 	this->m_iIntegrator = none;
 }
 
@@ -129,7 +130,7 @@ void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 		int p1 = this->addMassPoint(Vec3(0, 2, 0), Vec3(1, 0, 0), false);
 		this->addSpring(p0, p1, 1);
 		this->m_iIntegrator = euler;
-		this->timestep_override = 0.1;
+		this->timestep_override = 0.005;
 		this->m_fDamping = 1;
 		this->m_fStiffness = 40;
 		this->m_fMass = 10;
@@ -142,7 +143,7 @@ void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 		int p1 = this->addMassPoint(Vec3(0, 2, 0), Vec3(1, 0, 0), false);
 		this->addSpring(p0, p1, 1);
 		this->m_iIntegrator = midpoint;
-		this->timestep_override = 0.1;
+		this->timestep_override = 0.005;
 		this->m_fDamping = 1;
 		this->m_fStiffness = 40;
 		this->m_fMass = 10;
@@ -167,6 +168,11 @@ void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 			for (int j = 0;j < this->numVerticalPoints;j++)
 			{
 				int thisIndex =  this->addMassPoint(start + horizontalStep * i + verticalStep * j, Vec3(0, 0, 0), j == 0);
+
+				if (j == 0)
+				{
+					this->movablePoints.push_back(thisIndex);
+				}
 
 				int leftIndex = (i - 1) * this->numVerticalPoints + j; // The point to the left of this, already present as i - 1 < i
 
@@ -236,10 +242,36 @@ void MassSpringSystemSimulator::simulateTimestep(float time_step)
 
 void MassSpringSystemSimulator::onClick(int x, int y)
 {
+	if (m_trackmouse.x != 0 || m_trackmouse.y != 0)
+	{
+		// Apply the mouse deltas to g_vfMovableObjectPos (move along cameras view plane)
+		Point2D mouseDiff;
+		mouseDiff.x = x - m_trackmouse.x;
+		mouseDiff.y = y - m_trackmouse.y;
+		if (mouseDiff.x != 0 || mouseDiff.y != 0)
+		{
+			Mat4 worldViewInv = Mat4(DUC->g_camera.GetWorldMatrix() * DUC->g_camera.GetViewMatrix());
+			worldViewInv = worldViewInv.inverse();
+			Vec3 inputView = Vec3((float)mouseDiff.x, (float)-mouseDiff.y, 0);
+			Vec3 inputWorld = worldViewInv.transformVectorNormal(inputView);
+			// find a proper scale!
+			float inputScale = 0.001f;
+			inputWorld = inputWorld * inputScale;
+			for (int index : this->movablePoints)
+			{
+				this->mass_points[index].position += inputWorld;
+			}
+		}
+	}
+
+	m_trackmouse.x = x;
+	m_trackmouse.y = y;
 }
 
 void MassSpringSystemSimulator::onMouse(int x, int y)
 {
+	m_trackmouse.x = 0;
+	m_trackmouse.y = 0;
 }
 
 void MassSpringSystemSimulator::setMass(float mass)
@@ -306,7 +338,7 @@ void MassSpringSystemSimulator::calculateForcesForPoints(std::vector<MassPoint>&
 
 		const float current_length = norm(p1.position - p0.position);
 
-		const Vec3 force = this->m_fDamping * this->m_fStiffness * ((p1.position - p0.position) / current_length) * (current_length - s.initial_length);
+		const Vec3 force = this->m_fStiffness * ((p1.position - p0.position) / current_length) * (current_length - s.initial_length);
 		p0.force += force;
 		p1.force -= force;
 	}
@@ -315,6 +347,11 @@ void MassSpringSystemSimulator::calculateForcesForPoints(std::vector<MassPoint>&
 Vec3 clampPointPosition(const Vec3& position)
 {
 	return Vec3(position.x, max(0., position.y), position.z);
+}
+
+Vec3 MassSpringSystemSimulator::getForce(const MassPoint& p) const
+{
+	return p.force / this->m_fMass - this->m_fDamping * p.velocity;
 }
 
 void MassSpringSystemSimulator::stepEuler(float time_step)
@@ -326,11 +363,11 @@ void MassSpringSystemSimulator::stepEuler(float time_step)
 
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(p.position + time_step * p.velocity);
-			p.velocity = p.velocity + time_step * (p.force / this->m_fMass);
+			p.velocity = p.velocity + time_step * getForce(p);
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 }
 
@@ -342,12 +379,12 @@ void MassSpringSystemSimulator::stepLeapfrog(float time_step)
 	for (auto& p : this->mass_points) {
 
 		if (!p.is_fixed) {
-			p.velocity = p.velocity + time_step * (p.force / this->m_fMass);
+			p.velocity = p.velocity + time_step * getForce(p);
 			p.position = clampPointPosition(p.position + time_step * p.velocity);
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 }
 
@@ -363,11 +400,11 @@ void MassSpringSystemSimulator::stepMidpoint(float time_step)
 
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(p.position + (time_step / 2) * p.velocity);
-			p.velocity = p.velocity + (time_step / 2) * (p.force / this->m_fMass);
+			p.velocity = p.velocity + (time_step / 2) * getForce(p);
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 
 	// this->massPoints now has y~, the state of the system at x + h/2
@@ -383,11 +420,11 @@ void MassSpringSystemSimulator::stepMidpoint(float time_step)
 
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(p_original.position + time_step * p.velocity);
-			p.velocity = p_original.velocity + time_step * (p.force / this->m_fMass);
+			p.velocity = p_original.velocity + time_step * getForce(p);
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 }
 
@@ -403,11 +440,11 @@ void MassSpringSystemSimulator::stepRK4(float time_step)
 
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(p.position + (time_step / 2) * p.velocity);
-			p.velocity = p.velocity + (time_step / 2) * (p.force / this->m_fMass);
+			p.velocity = p.velocity + (time_step / 2) * getForce(p);
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 
 	this->calculateForcesForPoints(this->mass_points);
@@ -423,11 +460,11 @@ void MassSpringSystemSimulator::stepRK4(float time_step)
 
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(p_original.position + (time_step / 2) * p.velocity);
-			p.velocity = p_original.velocity + (time_step / 2) * (p.force / this->m_fMass);
+			p.velocity = p_original.velocity + (time_step / 2) * getForce(p);
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 
 	this->calculateForcesForPoints(this->mass_points);
@@ -442,11 +479,11 @@ void MassSpringSystemSimulator::stepRK4(float time_step)
 
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(p_original.position + time_step * p.velocity);
-			p.velocity = p_original.velocity + time_step * (p.force / this->m_fMass);
+			p.velocity = p_original.velocity + time_step * getForce(p);
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 
 	this->calculateForcesForPoints(this->mass_points);
@@ -465,11 +502,11 @@ void MassSpringSystemSimulator::stepRK4(float time_step)
 
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(k1.position + (time_step / 6) * (k1.velocity + 2 * k2.velocity + 2 * k3.velocity + k4.velocity));
-			p.velocity = k1.velocity + (time_step / 6) * (k1.force + 2 * k2.force + 2 * k3.force + k4.force) / this->m_fMass;
+			p.velocity = k1.velocity + (time_step / 6) * (getForce(k1) + 2 * getForce(k2) + 2 * getForce(k3) + getForce(k4));
 		}
 
 		// Reset accumulated force per frame
-		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+		p.force = Vec3(0.f, this->gravity, 0.f);
 	}
 }
 

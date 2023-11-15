@@ -96,7 +96,6 @@ private:
 	float timestep_override;
 
 	// UI Attributes
-	Vec3 m_externalForce;
 	Point2D m_mouse;
 	Point2D m_trackmouse;
 	Point2D m_oldtrackmouse;
@@ -109,6 +108,7 @@ private:
 
 	float gravity = 0;
 
+	std::vector<int> movablePoints;
 
 	void calculateForcesForPoints(std::vector<MassPoint>& points);
 
@@ -117,5 +117,6 @@ private:
 	void stepMidpoint(float time_step);
 	void stepRK4(float time_step);
 	float getPointDistance(int p0, int p1) const;
+	Vec3 getForce(const MassPoint&) const;
 };
 #endif
