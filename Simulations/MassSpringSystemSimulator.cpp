@@ -223,8 +223,12 @@ void MassSpringSystemSimulator::simulateTimestep(float time_step)
 	case midpoint:
 		this->stepMidpoint(time_step);
 		break;
+	case leapfrog:
+		this->stepLeapfrog(time_step);
+		break;
 	case rk4:
 		this->stepRK4(time_step);
+		break;
 	default:
 		break;
 	}
@@ -323,6 +327,23 @@ void MassSpringSystemSimulator::stepEuler(float time_step)
 		if (!p.is_fixed) {
 			p.position = clampPointPosition(p.position + time_step * p.velocity);
 			p.velocity = p.velocity + time_step * (p.force / this->m_fMass);
+		}
+
+		// Reset accumulated force per frame
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+	}
+}
+
+void MassSpringSystemSimulator::stepLeapfrog(float time_step)
+{
+	this->calculateForcesForPoints(this->mass_points);
+
+	// Euler: 
+	for (auto& p : this->mass_points) {
+
+		if (!p.is_fixed) {
+			p.velocity = p.velocity + time_step * (p.force / this->m_fMass);
+			p.position = clampPointPosition(p.position + time_step * p.velocity);
 		}
 
 		// Reset accumulated force per frame

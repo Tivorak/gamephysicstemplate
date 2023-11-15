@@ -113,6 +113,7 @@ private:
 	void calculateForcesForPoints(std::vector<MassPoint>& points);
 
 	void stepEuler(float time_step);
+	void stepLeapfrog(float time_step);
 	void stepMidpoint(float time_step);
 	void stepRK4(float time_step);
 	float getPointDistance(int p0, int p1) const;
