@@ -10,13 +10,13 @@ MassSpringSystemSimulator::MassSpringSystemSimulator() {
 
 const char* MassSpringSystemSimulator::getTestCasesStr()
 {
-	return "Demo1,Demo2,Demo3,Demo4";
+	return "Demo1,Demo2,Demo3,Demo4,Test";
 }
 
 void MassSpringSystemSimulator::initUI(DrawingUtilitiesClass* DUC)
 {
 	this->DUC = DUC;
-	const TwEnumVal integrators[4] = {
+	constexpr TwEnumVal integrators[5] = {
 		{
 			euler,
 			"Euler"
@@ -30,11 +30,15 @@ void MassSpringSystemSimulator::initUI(DrawingUtilitiesClass* DUC)
 			"LeapFrog"
 		},
 		{
+			rk4,
+			"RK4"
+		},
+		{
 			none,
 			"None"
 		}
 	};
-	const TwType integratorsType = TwDefineEnum("Integrators", integrators, 4);
+	const TwType integratorsType = TwDefineEnum("Integrators", integrators, 5);
 
 	switch (m_iTestCase)
 	{
@@ -47,6 +51,11 @@ void MassSpringSystemSimulator::initUI(DrawingUtilitiesClass* DUC)
 		TwAddVarRW(DUC->g_pTweakBar, "Integrator", integratorsType, &this->m_iIntegrator, nullptr);
 		TwAddVarRW(DUC->g_pTweakBar, "horizontal points", TW_TYPE_UINT16, &this->numHorizontalPoints, nullptr);
 		TwAddVarRW(DUC->g_pTweakBar, "vertical points", TW_TYPE_UINT16, &this->numVerticalPoints, nullptr);
+		TwAddVarRW(DUC->g_pTweakBar, "external force", TW_TYPE_DIR3F, &this->m_externalForce, nullptr);
+		TwAddVarRW(DUC->g_pTweakBar, "gravity", TW_TYPE_FLOAT, &this->gravity, nullptr);
+		TwAddVarRW(DUC->g_pTweakBar, "damping factor", TW_TYPE_FLOAT, &this->m_fDamping, nullptr);
+		TwAddVarRW(DUC->g_pTweakBar, "stiffness", TW_TYPE_FLOAT, &this->m_fStiffness, nullptr);
+		TwAddVarRW(DUC->g_pTweakBar, "mass", TW_TYPE_FLOAT, &this->m_fMass, nullptr);
 		break;
 	}
 }
@@ -82,6 +91,10 @@ void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 	case 0: // Demo 1
 	{
 		cout << "Selecting Demo 1" << std::endl;
+		this->m_fDamping = 1;
+		this->m_fStiffness = 40;
+		this->m_fMass = 10;
+
 		int p0 = this->addMassPoint(Vec3(0, 0, 0), Vec3(-1, 0, 0), false);
 		int p1 = this->addMassPoint(Vec3(0, 2, 0), Vec3(1, 0, 0), false);
 		this->addSpring(p0, p1, 1);
@@ -117,6 +130,9 @@ void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 		this->addSpring(p0, p1, 1);
 		this->m_iIntegrator = euler;
 		this->timestep_override = 0.1;
+		this->m_fDamping = 1;
+		this->m_fStiffness = 40;
+		this->m_fMass = 10;
 		break;
 	}
 	case 2: // Demo 3
@@ -127,17 +143,24 @@ void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 		this->addSpring(p0, p1, 1);
 		this->m_iIntegrator = midpoint;
 		this->timestep_override = 0.1;
+		this->m_fDamping = 1;
+		this->m_fStiffness = 40;
+		this->m_fMass = 10;
 		break;
 	}
 	case 3: // Demo 4
 	{
-		const Vec3 start = Vec3(-0.5, 2.5, 0);
+		this->m_fDamping = 1;
+		this->m_fStiffness = 500;
+		this->m_fMass = 1;
+		this->gravity = -9.81;
+		const Vec3 start = Vec3(-0.5, 1.5, 0);
 
 		const float horizontalSize = 1;
 		const float verticalSize = 2;
 
 		Vec3 horizontalStep = Vec3(horizontalSize / this->numHorizontalPoints, 0, 0);
-		Vec3 verticalStep = -Vec3(0, verticalSize / this->numVerticalPoints, 0);
+		Vec3 verticalStep = -Vec3(0, 0, verticalSize / this->numVerticalPoints);
 
 		for (int i = 0; i < this->numHorizontalPoints;i++)
 		{
@@ -145,21 +168,35 @@ void MassSpringSystemSimulator::notifyCaseChanged(int testCase)
 			{
 				int thisIndex =  this->addMassPoint(start + horizontalStep * i + verticalStep * j, Vec3(0, 0, 0), j == 0);
 
-				int leftIndex = (i - 1) * this->numVerticalPoints + j;
+				int leftIndex = (i - 1) * this->numVerticalPoints + j; // The point to the left of this, already present as i - 1 < i
 
 				if (leftIndex >= 0 && leftIndex < this->mass_points.size())
 				{
-					this->addSpring(leftIndex, thisIndex, abs(horizontalStep.x));
+					this->addSpring(leftIndex, thisIndex, norm(horizontalStep));
 				}
 
-				int upIndex = i * this->numVerticalPoints + (j - 1);
+				int upIndex = i * this->numVerticalPoints + (j - 1); // The point to the top of this, already present as (j - 1) < j
 
 				if (j != 0 && upIndex >= 0 && upIndex < this->mass_points.size())
 				{
-					this->addSpring(upIndex, thisIndex, abs(verticalStep.y));
+					this->addSpring(upIndex, thisIndex, norm(verticalStep));
 				}
+
+				int leftUpperIndex = (i - 1) * this->numVerticalPoints + (j - 1); // The point to the upper left of this, already present as (i - 1) < i
+
+				if (j != 0 && leftUpperIndex >= 0 && leftUpperIndex < this->mass_points.size())
+				{
+					this->addSpring(leftUpperIndex, thisIndex, norm(horizontalStep + verticalStep));
+				}
+
 			}
 		}
+
+		// 	// Connect the 4 corners
+		// this->addSpring(0, this->numVerticalPoints - 1); // top left to bottom left
+		// this->addSpring(0, (this->numHorizontalPoints - 1) * this->numVerticalPoints); // top left to top right
+		// this->addSpring((this->numHorizontalPoints - 1) * this->numVerticalPoints, (this->numHorizontalPoints * this->numVerticalPoints) - 1); // top right to bottom right
+		// this->addSpring(this->numVerticalPoints - 1, (this->numHorizontalPoints* this->numVerticalPoints) - 1); // bottom left to bottom right
 
 	}
 	}
@@ -186,6 +223,8 @@ void MassSpringSystemSimulator::simulateTimestep(float time_step)
 	case midpoint:
 		this->stepMidpoint(time_step);
 		break;
+	case rk4:
+		this->stepRK4(time_step);
 	default:
 		break;
 	}
@@ -201,14 +240,17 @@ void MassSpringSystemSimulator::onMouse(int x, int y)
 
 void MassSpringSystemSimulator::setMass(float mass)
 {
+	this->m_fMass;
 }
 
 void MassSpringSystemSimulator::setStiffness(float stiffness)
 {
+	this->m_fStiffness = stiffness;
 }
 
 void MassSpringSystemSimulator::setDampingFactor(float damping)
 {
+	this->m_fDamping = damping;
 }
 
 int MassSpringSystemSimulator::addMassPoint(Vec3 position, Vec3 velocity, bool isFixed)
@@ -219,7 +261,12 @@ int MassSpringSystemSimulator::addMassPoint(Vec3 position, Vec3 velocity, bool i
 
 void MassSpringSystemSimulator::addSpring(int masspoint1, int masspoint2, float initialLength)
 {
-	this->springs.push_back(Spring(masspoint1, masspoint2, initialLength, 40));
+	this->springs.push_back(Spring(masspoint1, masspoint2, initialLength));
+}
+
+void MassSpringSystemSimulator::addSpring(int p0, int p1)
+{
+	this->springs.push_back(Spring(p0, p1, this->getPointDistance(p0, p1))); 
 }
 
 int MassSpringSystemSimulator::getNumberOfMassPoints()
@@ -253,12 +300,17 @@ void MassSpringSystemSimulator::calculateForcesForPoints(std::vector<MassPoint>&
 		MassPoint& p0 = points.at(s.mass_point_1);
 		MassPoint& p1 = points.at(s.mass_point_2);
 
-		const float current_length = sqrt(p0.position.squaredDistanceTo(p1.position));
+		const float current_length = norm(p1.position - p0.position);
 
-		const Vec3 force = s.stiffness * ((p1.position - p0.position) / current_length) * (current_length - s.initial_length);
+		const Vec3 force = this->m_fDamping * this->m_fStiffness * ((p1.position - p0.position) / current_length) * (current_length - s.initial_length);
 		p0.force += force;
 		p1.force -= force;
 	}
+}
+
+Vec3 clampPointPosition(const Vec3& position)
+{
+	return Vec3(position.x, max(0., position.y), position.z);
 }
 
 void MassSpringSystemSimulator::stepEuler(float time_step)
@@ -269,12 +321,12 @@ void MassSpringSystemSimulator::stepEuler(float time_step)
 	for (auto& p : this->mass_points) {
 
 		if (!p.is_fixed) {
-			p.position = p.position + time_step * p.velocity;
-			p.velocity = p.velocity + time_step * (p.force / p.mass);
+			p.position = clampPointPosition(p.position + time_step * p.velocity);
+			p.velocity = p.velocity + time_step * (p.force / this->m_fMass);
 		}
 
 		// Reset accumulated force per frame
-		p.force = 0;
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
 	}
 }
 
@@ -289,12 +341,12 @@ void MassSpringSystemSimulator::stepMidpoint(float time_step)
 	for (auto& p : this->mass_points) {
 
 		if (!p.is_fixed) {
-			p.position = p.position + (time_step / 2) * p.velocity;
-			p.velocity = p.velocity + (time_step / 2) * (p.force / p.mass);
+			p.position = clampPointPosition(p.position + (time_step / 2) * p.velocity);
+			p.velocity = p.velocity + (time_step / 2) * (p.force / this->m_fMass);
 		}
 
 		// Reset accumulated force per frame
-		p.force = 0;
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
 	}
 
 	// this->massPoints now has y~, the state of the system at x + h/2
@@ -309,21 +361,108 @@ void MassSpringSystemSimulator::stepMidpoint(float time_step)
 		const MassPoint& p_original = original_points.at(i);
 
 		if (!p.is_fixed) {
-			p.position = p_original.position + time_step * p.velocity;
-			p.velocity = p_original.velocity + time_step * (p.force / p.mass);
+			p.position = clampPointPosition(p_original.position + time_step * p.velocity);
+			p.velocity = p_original.velocity + time_step * (p.force / this->m_fMass);
 		}
 
 		// Reset accumulated force per frame
-		p.force = 0;
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
 	}
+}
+
+void MassSpringSystemSimulator::stepRK4(float time_step)
+{
+	// this is k1
+	std::vector<MassPoint> original_points = std::vector<MassPoint>(this->mass_points);
+
+	this->calculateForcesForPoints(this->mass_points);
+
+	// Do a half-step to k2
+	for (auto& p : this->mass_points) {
+
+		if (!p.is_fixed) {
+			p.position = clampPointPosition(p.position + (time_step / 2) * p.velocity);
+			p.velocity = p.velocity + (time_step / 2) * (p.force / this->m_fMass);
+		}
+
+		// Reset accumulated force per frame
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+	}
+
+	this->calculateForcesForPoints(this->mass_points);
+	// "this" now holds k2
+
+	std::vector<MassPoint> k2_points = std::vector<MassPoint>(this->mass_points);
+
+	// Do a half-step using k2, from the original
+
+	for (int i = 0; i < this->mass_points.size(); i++) {
+		MassPoint& p = this->mass_points.at(i);
+		const MassPoint& p_original = original_points.at(i);
+
+		if (!p.is_fixed) {
+			p.position = clampPointPosition(p_original.position + (time_step / 2) * p.velocity);
+			p.velocity = p_original.velocity + (time_step / 2) * (p.force / this->m_fMass);
+		}
+
+		// Reset accumulated force per frame
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+	}
+
+	this->calculateForcesForPoints(this->mass_points);
+
+	// "this" now holds k3
+
+	std::vector<MassPoint> k3_points = std::vector<MassPoint>(this->mass_points);
+
+	for (int i = 0; i < this->mass_points.size(); i++) {
+		MassPoint& p = this->mass_points.at(i);
+		const MassPoint& p_original = original_points.at(i);
+
+		if (!p.is_fixed) {
+			p.position = clampPointPosition(p_original.position + time_step * p.velocity);
+			p.velocity = p_original.velocity + time_step * (p.force / this->m_fMass);
+		}
+
+		// Reset accumulated force per frame
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+	}
+
+	this->calculateForcesForPoints(this->mass_points);
+
+	// "this" now holds k4
+
+	std::vector<MassPoint> k4_points = std::vector<MassPoint>(this->mass_points);
+
+	for (int i = 0; i < this->mass_points.size(); i++) {
+		MassPoint& p = this->mass_points.at(i);
+		const MassPoint& k1 = original_points.at(i);
+		const MassPoint& k2 = k2_points.at(i);
+		const MassPoint& k3 = k3_points.at(i);
+		const MassPoint& k4 = k4_points.at(i);
+
+
+		if (!p.is_fixed) {
+			p.position = clampPointPosition(k1.position + (time_step / 6) * (k1.velocity + 2 * k2.velocity + 2 * k3.velocity + k4.velocity));
+			p.velocity = k1.velocity + (time_step / 6) * (k1.force + 2 * k2.force + 2 * k3.force + k4.force) / this->m_fMass;
+		}
+
+		// Reset accumulated force per frame
+		p.force = Vec3(0.f, this->gravity, 0.f) + this->m_externalForce;
+	}
+}
+
+float MassSpringSystemSimulator::getPointDistance(int p0, int p1) const
+{
+	return norm(this->mass_points.at(p0).position - this->mass_points.at(p1).position);
 }
 
 std::ostream& operator<<(std::ostream& os, const MassPoint& p)
 {
-	return os << "MassPoint at " << p.position << " with velocity " << p.velocity << " and mass " << p.mass << '.';
+	return os << "MassPoint at " << p.position << " with velocity " << p.velocity << '.';
 }
 
 std::ostream& operator<<(std::ostream& os, const Spring& p)
 {
-	return os << "Spring between mass points [" << p.mass_point_1 << ", " << p.mass_point_2 << "], with initial length " << p.initial_length << " and stiffness " << p.stiffness << '.';
+	return os << "Spring between mass points [" << p.mass_point_1 << ", " << p.mass_point_2 << "], with initial length " << p.initial_length << '.';
 }

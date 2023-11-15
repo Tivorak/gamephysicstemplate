@@ -13,6 +13,7 @@ enum integrator
 	euler = EULER,
 	leapfrog = LEAPFROG,
 	midpoint = MIDPOINT,
+	rk4,
 	none
 };
 
@@ -21,8 +22,7 @@ public:
 	MassPoint(const Vec3& position, const Vec3& velocity, const float mass, const bool is_fixed)
 		: position(position),
 		  velocity(velocity),
-		  is_fixed(is_fixed),
-		  mass(mass)
+		  is_fixed(is_fixed)
 	{
 	}
 
@@ -31,19 +31,16 @@ public:
 	Vec3 force;
 
 	bool is_fixed;
-
-	float mass;
 };
 
 std::ostream& operator<<(std::ostream& os, const MassPoint& p);
 
 class Spring {
 public:
-	Spring(const int mass_point_1, const int mass_point_2, const float initial_length, const float stiffness)
+	Spring(const int mass_point_1, const int mass_point_2, const float initial_length)
 		: mass_point_1(mass_point_1),
 		  mass_point_2(mass_point_2),
-		  initial_length(initial_length),
-		  stiffness(stiffness)
+		  initial_length(initial_length)
 	{
 	}
 
@@ -51,7 +48,6 @@ public:
 	int mass_point_2;
 
 	float initial_length;
-	float stiffness;
 };
 
 std::ostream& operator<<(std::ostream& os, const Spring& p);
@@ -78,6 +74,7 @@ public:
 	void setDampingFactor(float damping);
 	int addMassPoint(Vec3 position, Vec3 velocity, bool isFixed);
 	void addSpring(int masspoint1, int masspoint2, float initialLength);
+	void addSpring(int p0, int p1);
 	int getNumberOfMassPoints();
 	int getNumberOfSprings();
 	Vec3 getPositionOfMassPoint(int index);
@@ -108,12 +105,16 @@ private:
 	std::vector<Spring> springs;
 
 	uint16_t numHorizontalPoints = 10;
-	uint16_t numVerticalPoints = 40;
+	uint16_t numVerticalPoints = 20;
+
+	float gravity = 0;
 
 
 	void calculateForcesForPoints(std::vector<MassPoint>& points);
 
 	void stepEuler(float time_step);
 	void stepMidpoint(float time_step);
+	void stepRK4(float time_step);
+	float getPointDistance(int p0, int p1) const;
 };
 #endif
