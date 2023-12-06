@@ -1,6 +1,9 @@
 #ifndef RIGIDBODYSYSTEMSIMULATOR_h
 #define RIGIDBODYSYSTEMSIMULATOR_h
+#include <d3d11.h>
+
 #include "Simulator.h"
+#include "RigidBody.h"
 //add your header for your rigid body system, for e.g.,
 //#include "rigidBodySystem.h" 
 
