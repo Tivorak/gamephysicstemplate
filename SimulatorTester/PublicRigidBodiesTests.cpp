@@ -61,13 +61,13 @@ namespace SimulatorTester
 			Assert::AreEqual(-0.2f,(float)pos.y,0.0001f,L"Y coordinate of body 0 is not right",LINE_INFO());
 			Assert::AreEqual(0.16f,(float)pos.z,0.0001f,L"Z coordinate of body 0 is not right",LINE_INFO());
 			Vec3 vel = rbss->getLinearVelocityOfRigidBody(0);
-			Assert::AreEqual(0.0f,(float)vel.x,0.0001f,L"X componnent of body 0 is not right",LINE_INFO());
-			Assert::AreEqual(0.0f,(float)vel.y,0.0001f,L"Y componnent of body 0 is not right",LINE_INFO());
-			Assert::AreEqual(0.2f,(float)vel.z,0.0001f,L"Z componnent of body 0 is not right",LINE_INFO());
+			Assert::AreEqual(0.0f,(float)vel.x,0.0001f,L"X linear velocity of body 0 is not right",LINE_INFO());
+			Assert::AreEqual(0.0f,(float)vel.y,0.0001f,L"Y linear velocity of body 0 is not right",LINE_INFO());
+			Assert::AreEqual(0.2f,(float)vel.z,0.0001f,L"Z linear velocity of body 0 is not right",LINE_INFO());
 			Vec3 angvel = rbss->getAngularVelocityOfRigidBody(0);
-			Assert::AreEqual(5.8590f,(float)angvel.x,0.0001f,L"X componnent of body 0 is not right",LINE_INFO());
-			Assert::AreEqual(-2.1106f,(float)angvel.y,0.0001f,L"Y componnent of body 0 is not right",LINE_INFO());
-			Assert::AreEqual(-1.1391f,(float)angvel.z,0.0001f,L"Z componnent of body 0 is not right",LINE_INFO());
+			Assert::AreEqual(5.8590f,(float)angvel.x,0.0001f,L"X angular velocity of body 0 is not right",LINE_INFO());
+			Assert::AreEqual(-2.1106f,(float)angvel.y,0.0001f,L"Y angular velocity of body 0 is not right",LINE_INFO());
+			Assert::AreEqual(-1.1391f,(float)angvel.z,0.0001f,L"Z angular velocity of body 0 is not right",LINE_INFO());
 			delete rbss;
 		}
 

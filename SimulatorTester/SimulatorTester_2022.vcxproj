@@ -163,6 +163,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Simulations\RigidBody.cpp" />
+    <ClCompile Include="..\Simulations\RigidBodySystemSimulator.cpp" />
     <ClCompile Include="PublicRigidBodiesTests.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -187,6 +189,10 @@
     <ProjectReference Include="..\Simulations\Demo_2022.vcxproj">
       <Project>{3cabed2c-12f1-4408-aaae-e2185a426f35}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Simulations\RigidBody.h" />
+    <ClInclude Include="..\Simulations\RigidBodySystemSimulator.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

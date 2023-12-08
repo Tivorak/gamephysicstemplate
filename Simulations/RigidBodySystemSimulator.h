@@ -2,8 +2,8 @@
 #define RIGIDBODYSYSTEMSIMULATOR_h
 #include <d3d11.h>
 
-#include "Simulator.h"
 #include "RigidBody.h"
+#include "Simulator.h"
 //add your header for your rigid body system, for e.g.,
 //#include "rigidBodySystem.h" 
 
@@ -45,5 +45,7 @@ private:
 	Point2D m_mouse;
 	Point2D m_trackmouse;
 	Point2D m_oldtrackmouse;
+
+	std::vector<RigidBody> bodies;
 	};
 #endif
