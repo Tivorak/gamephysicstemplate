@@ -4,10 +4,9 @@ void RigidBody::add_force(Vec3 force, Vec3 world_location)
 {
 	Mat4 translation_matrix;
 	translation_matrix.initTranslation(-this->center_of_mass.x, -this->center_of_mass.y, -this->center_of_mass.z);
-	Mat4 rotation_matrix = this->orientation.getRotMat();
-	rotation_matrix.transpose();
+
 	this->forces += force;
-	Vec3 temp_loc = (translation_matrix * rotation_matrix).transformVector(world_location);
+	Vec3 temp_loc = translation_matrix.transformVector(world_location);
 	Vec3 temp_force = force;
 	this->torque += cross(temp_loc, temp_force);
 }
