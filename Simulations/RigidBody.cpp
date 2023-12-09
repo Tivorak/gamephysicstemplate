@@ -95,6 +95,16 @@ Vec3 RigidBody::calcImpulse(const Vec3& world_location, const Vec3& world_normal
 	return cross(inverse_inertia_tensor.transformVector(cross(body_location, world_normal)), body_location);
 }
 
+void RigidBody::print()
+{
+	printf("CoM: %f %f %f\n", this->center_of_mass.x, this->center_of_mass.y, this->center_of_mass.z);
+	printf("v_lin: %f %f %f\n", this->linear_velocity.x, this->linear_velocity.y, this->linear_velocity.z);
+	printf("v_ang: %f %f %f\n", this->angular_velocity.x, this->angular_velocity.y, this->angular_velocity.z);
+	Vec3 body_location = getWorldToBody().transformVector(Vec3(0.3,0.5,0.25));
+	Vec3 result = this->linear_velocity + cross(this->angular_velocity, body_location);
+	printf("v of  (0.3, 0.5, 0.25): %f %f %f\n",result.x, result.y, result.z);
+}
+
 void RigidBody::do_step(float h)
 {
 	this->center_of_mass += h * this->linear_velocity;

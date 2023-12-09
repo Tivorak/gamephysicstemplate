@@ -26,6 +26,8 @@ public:
 	Vec3 getWorldVelocityAt(const Vec3& world_location);
 	Vec3 calcImpulse(const Vec3& world_location, const Vec3& world_normal);
 
+	void print();
+
 private:
 
 	Mat4 inverse_base_inertia_tensor;
